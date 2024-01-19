@@ -7,12 +7,12 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=textwrap.dedent('''\
 
-Convert ABSplice output to bed so that the highest score is presented (color coded)
-and with a field that lists the top three tissues, and another field that lists all tissues and values
-so that it can be converted to mouseover and a click-through table.
-We also need ref and alt allele fields.
-Todo: figure out if pos is 0 or 1 based
-bedToBigBed -type=bed9+1 -tab -as=abSplice.as sorted.bed chrom.sizes output.bb
+Convert ABSplice output to bed so that the highest score is presented as a color coded block with both alleles as name.
+A mouseOver field lists the top score and all tissues that have this score, 
+and another field presents all tissues and values in a HTML table format that will be shown
+on click through.
+Strand information is pulled in from a tab separated file extracted from gencode v38 (gene ID, strand)
+bedToBigBed -type=bed9+3 -tab -as=abSplice.as sorted.bed chrom.sizes output.bb
 
         '''))
 group = parser.add_argument_group('required arguments')
@@ -22,6 +22,7 @@ parser.add_argument('--outfile', type=str, default='tmp.bed',  help="Output file
 parser.add_argument('--strands', type=str, default='gene.strands',  help="Tab separated file with strand and gene ID (default gene.strands)")
 parser.add_argument('-d', '--debug', help="Optional debugging output", action='store_true')
 
+# the score field must be 0-1000 so either we must convert or not use
 
 if len(sys.argv)==1:
     parser.print_help()
@@ -58,6 +59,7 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
 
     # Find the indices of columns starting with 'AbSplice_DNA'
     indices_to_keep = [i for i, col in enumerate(header) if col.startswith('AbSplice_DNA')]
+    header = [column.replace('ABSplice_DNA_', '') for column in header]
 
     # Open the output file with the csv.writer
     with open(args.outfile, 'w', newline='', encoding='utf-8') as outfile:
@@ -76,19 +78,18 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
             if row['chrom'] == 'chrom':
                 continue
             # Get the index and value for each column in indices_to_keep
-            all_values = [(header[i].replace('AbSplice_DNA_', ''), float(row[header[i]]) if row[header[i]] else 0) for i in indices_to_keep]
+            all_values = [(header[i], row[header[i]]) for i in indices_to_keep]
             # turn this information into a html table
             html_table = '<table>'
             for tvals in all_values:
                 html_table += f'  <tr><td>{tvals[0]}</td><td>{tvals[1]}</td></tr>'
             html_table += '</table>'
 
-
-            # Find the maximum value
+            # Find the maximum value (first make sure all row entries are floats)
+            all_values = [(x, float(y) if y else 0) for x, y in all_values]
             max_value = max(all_values, key=lambda x: x[1])[1]
 
             # Filter max_values to include only entries with the maximum value
-            #all_entries = [(column, value) for column, value in all_values]
             max_entries = [column for column, value in all_values if value == max_value]
 
             # mouseover information
@@ -96,13 +97,10 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
             topValString += '<br>'.join(max_entries)
 
             # this will be the item label
-            name = f"{row['ref']}/{row['alt']}"
+            name = f"{row['ref']}>{row['alt']}"
 
-
-# the score must be 0-1000 so either we must convert or not use
-# the strand is of interest, but must be pulled in from another source if we want it
-# I think the mouseover should show the score,right. And color the intensity.
-            startpos = int(row['pos'])
+            # AB coordinates appear to be 1-based
+            startpos = int(row['pos']) -1 
             if args.debug:
                 if ct == 15:
                     sys.exit()
@@ -110,5 +108,4 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
                 print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{row['gene_id']}\t{topValString}\t{html_table}")
             writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), row['gene_id'], topValString, html_table])
 
-#topValString)
 
