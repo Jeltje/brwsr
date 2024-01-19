@@ -12,6 +12,7 @@ and with a field that lists the top three tissues, and another field that lists 
 so that it can be converted to mouseover and a click-through table.
 We also need ref and alt allele fields.
 Todo: figure out if pos is 0 or 1 based
+bedToBigBed -type=bed9+1 -tab -as=abSplice.as sorted.bed chrom.sizes output.bb
 
         '''))
 group = parser.add_argument_group('required arguments')
@@ -47,6 +48,7 @@ with open(args.strands, 'r') as infile:
 
 # Open the input file with the csv.DictReader
 ct = 0
+print(args.inputfile)
 with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
     # Create a csv.DictReader object with tab as the delimiter
     reader = csv.DictReader(infile, delimiter='\t')
@@ -92,30 +94,13 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
 # the score must be 0-1000 so either we must convert or not use
 # the strand is of interest, but must be pulled in from another source if we want it
 # I think the mouseover should show the score,right. And color the intensity.
-# TODO: something with the ALT allele
             startpos = int(row['pos'])
             if args.debug:
                 if ct == 15:
                     sys.exit()
                 ct += 1
-                print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{1}\t{1}\t{0}")
-            writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), 1, 1, 0])
+                print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{row['gene_id']}")
+            writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), row['gene_id']])
 
 #topValString)
-
-
-#    char[1] strand;    "+ or -"
-#    uint thickStart;   "Start of where display should be thick (start codon)"
-#    uint thickEnd;     "End of where display should be thick (stop codon)"
-#    uint color;        "Primary RGB color for the decoration"
-#    int blockCount;    "Number of blocks"
-#    int[blockCount] blockSizes; "Comma separated list of block sizes"
-#    int[blockCount] chromStarts; "Start positions relative to chromStart"
-#    string decoratedItem; "Identity of the decorated item in chr:start-end:item_name format"
-#    string style;      "Draw style for the decoration (e.g. block, glyph)"
-#    string fillColor;  "Secondary color to use for filling decoration, blocks, supports RGBA"
-#    string glyph;  "The glyph to draw in glyph mode; ignored for other styles"
-
-
-
 
