@@ -75,14 +75,21 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
             # omit in-file header rows (we're working on a concatenated file)
             if row['chrom'] == 'chrom':
                 continue
-            # Get the index and maximum value for each column in indices_to_keep
-            max_values = [(header[i].replace('AbSplice_DNA_', ''), float(row[header[i]]) if row[header[i]] else 0) for i in indices_to_keep]
+            # Get the index and value for each column in indices_to_keep
+            all_values = [(header[i].replace('AbSplice_DNA_', ''), float(row[header[i]]) if row[header[i]] else 0) for i in indices_to_keep]
+            # turn this information into a html table
+            html_table = '<table>'
+            for tvals in all_values:
+                html_table += f'  <tr><td>{tvals[0]}</td><td>{tvals[1]}</td></tr>'
+            html_table += '</table>'
+
+
             # Find the maximum value
-            max_value = max(max_values, key=lambda x: x[1])[1]
+            max_value = max(all_values, key=lambda x: x[1])[1]
 
             # Filter max_values to include only entries with the maximum value
-            #max_entries = [(column, value) for column, value in max_values if value == max_value]
-            max_entries = [column for column, value in max_values if value == max_value]
+            #all_entries = [(column, value) for column, value in all_values]
+            max_entries = [column for column, value in all_values if value == max_value]
 
             # mouseover information
             topValString = f'Max score {max_value} in <br>'
@@ -100,8 +107,8 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
                 if ct == 15:
                     sys.exit()
                 ct += 1
-                print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{row['gene_id']}\t{topValString}")
-            writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), row['gene_id'], topValString])
+                print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{row['gene_id']}\t{topValString}\t{html_table}")
+            writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), row['gene_id'], topValString, html_table])
 
 #topValString)
 
