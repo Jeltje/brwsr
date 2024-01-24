@@ -2,10 +2,14 @@
 
 import sys, os, re, argparse, textwrap
 import csv
+import gzip
+from multiprocessing import Pool
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=textwrap.dedent('''\
+
+Now loops over directory with gzipped tab separated files
 
 Convert ABSplice output to bed so that the highest score is presented as a color coded block with both alleles as name.
 A mouseOver field lists the top score and all tissues that have this score, 
@@ -14,12 +18,16 @@ on click through.
 Strand information is pulled in from a tab separated file extracted from gencode v38 (gene ID, strand)
 bedToBigBed -type=bed9+3 -tab -as=abSplice.as sorted.bed chrom.sizes output.bb
 
+Also make a track of the delta_score, which is the SpliceAI score for every position. 
+In both cases, remember there are duplicates when different genes have overlapping exons
+
         '''))
 group = parser.add_argument_group('required arguments')
-group.add_argument('inputfile', type=str, help='DESCRIBE ME')
+group.add_argument('indir', type=str, help='input directory')
 # optional flag
-parser.add_argument('--outfile', type=str, default='tmp.bed',  help="Output filename (default tmp.bed)")
+parser.add_argument('--outfile', type=str, default='tmpout',  help="Output filename base (default tmpout)")
 parser.add_argument('--strands', type=str, default='gene.strands',  help="Tab separated file with strand and gene ID (default gene.strands)")
+parser.add_argument('--threads', type=int, default=8,  help="Number of threads, default 8")
 parser.add_argument('-d', '--debug', help="Optional debugging output", action='store_true')
 
 # the score field must be 0-1000 so either we must convert or not use
@@ -31,26 +39,19 @@ args = parser.parse_args()
 
 def itemRGB(score):
     '''Return color based on score'''
+    # https://github.com/gagneurlab/absplice?tab=readme-ov-file#output
+    # score cutoffs should be 0.2, 0.05 and 0.01
     rgb = '255,255,255' # black
-    # blue, violet, pink, red
-    for cutoff, color in [[0.5, '0,0,255'], [0.3, '170,0,204'], [0.1, '230,0,191'], [0.01, '255,0,0']]:
+    # red (high) , orange, blue (low)
+    for cutoff, color in [[0.2, '255,0,0'], [0.05, '255,128,0'], [0.01, '0,0,255']]:
         if score >= cutoff:
             return color
     return rgb
-# Main
-
-# read the strands
-strands = dict()
-with open(args.strands, 'r') as infile:
-    for line in infile:
-        strand, gene = line.strip().split('\t')
-        strands[gene] = strand
 
 
 # Open the input file with the csv.DictReader
-ct = 0
-print(args.inputfile)
-with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
+def process_gzipped_file(file_path, outbed):
+  with gzip.open(file_path, 'rt') as infile:
     # Create a csv.DictReader object with tab as the delimiter
     reader = csv.DictReader(infile, delimiter='\t')
 
@@ -61,16 +62,11 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
     indices_to_keep = [i for i, col in enumerate(header) if col.startswith('AbSplice_DNA')]
     header = [column.replace('ABSplice_DNA_', '') for column in header]
 
-    # Open the output file with the csv.writer
-    with open(args.outfile, 'w', newline='', encoding='utf-8') as outfile:
+    # Open the output files with the csv.writer
+    #with open(args.outfile, 'a', newline='', encoding='utf-8') as outfile:
+    with open(outbed, 'a', newline='', encoding='utf-8') as outfile:
         # Create a csv.writer object with tab as the delimiter
         writer = csv.writer(outfile, delimiter='\t')
-
-        # Write the updated header to the output file
-        if args.debug:
-            print('track name=ABsplice_test1 description="ABsplice_test1" itemRgb="On" visibility="dense"')
-        else:
-            print(f'remember to sort the output like so: sort -k1,1 -k2,2n {args.outfile} > sorted.bed')
 
         # Iterate over rows in the input file and write selected columns to the output file
         for row in reader:
@@ -88,24 +84,43 @@ with open(args.inputfile, 'r', newline='', encoding='utf-8') as infile:
             # Find the maximum value (first make sure all row entries are floats)
             all_values = [(x, float(y) if y else 0) for x, y in all_values]
             max_value = max(all_values, key=lambda x: x[1])[1]
+            if max_value == 0:
+                topValString = f'No tissues with scores > 0'
+            else:
+                # Filter max_values to include only entries with the maximum value
+                max_entries = [column for column, value in all_values if value == max_value]
 
-            # Filter max_values to include only entries with the maximum value
-            max_entries = [column for column, value in all_values if value == max_value]
-
-            # mouseover information
-            topValString = f'Max score {max_value} in <br>'
-            topValString += '<br>'.join(max_entries)
+                # mouseover information
+                topValString = f'Max score {max_value} in <br>'
+                topValString += '<br>'.join(max_entries)
 
             # this will be the item label
             name = f"{row['ref']}>{row['alt']}"
 
             # AB coordinates appear to be 1-based
             startpos = int(row['pos']) -1 
-            if args.debug:
-                if ct == 15:
-                    sys.exit()
-                ct += 1
-                print(f"{row['chrom']}\t{startpos}\t{startpos+1}\t{name}\t0\t{strands[row['gene_id']]}\t{startpos}\t{startpos}\t{itemRGB(max_value)}\t{row['gene_id']}\t{topValString}\t{html_table}")
             writer.writerow([row['chrom'], startpos, startpos+1, name, 0, strands[row['gene_id']], startpos, startpos, itemRGB(max_value), row['gene_id'], topValString, html_table])
+
+# Main
+
+# read the strands
+strands = dict()
+with open(args.strands, 'r') as infile:
+    for line in infile:
+        strand, gene = line.strip().split('\t')
+        strands[gene] = strand
+
+# Let's not append to an existing file
+outfile = args.outfile + '.ab.bed'
+if os.path.exists(outfile):
+    os.remove(outfile)
+
+# Get a list of all files in the directory
+gzfiles = [os.path.join(args.indir, filename) for filename in os.listdir(args.indir) if filename.endswith(".gz")]
+
+# Create a Pool with the specified number of processes
+with Pool(args.threads) as pool:
+        # Map the process_gzipped_file function to the list of files
+        pool.starmap(process_gzipped_file, [(infile, args.outfile + '.ab.bed') for infile in gzfiles])
 
 
