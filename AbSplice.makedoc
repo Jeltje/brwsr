@@ -1,18 +1,18 @@
 #! /bin/bash
 
-###cd /hive/data/genomes/hg38/bed/absplice
-###mv AbSplice_DNA_hg38_snvs_high_scores AbSplice_DNA_hg38_snvs_high_scores_v1
-###wget 'https://zenodo.org/records/10781457/files/AbSplice_DNA_hg38_snvs_high_scores.zip'
-###mv AbSplice_DNA_hg38_snvs_high_scores.zip\?download\=1 AbSplice_DNA_hg38_snvs_high_scores.zip
-###unzip AbSplice_DNA_hg38_snvs_high_scores.zip
-###
-#### Unpacks in per-gene files (gencode v38) in three directories, with score_cutoffs 0.01, 0.05 and 0.2
-#### using the lowest cutoff (most files) for this track
-###
-#### the files have coordinates and gene IDs but not strand info, and I want to add this to the track
-###wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gff3.gz
-###zcat gencode.v38.annotation.gff3.gz | grep -P '\tgene\t' | cut -f7,9 | sed 's/ID=.*gene_id=//' | \
-###	sed 's/\..*gene_name=/\t/' | sed 's/;.*//' > gene.strands
+cd /hive/data/genomes/hg38/bed/absplice
+mv AbSplice_DNA_hg38_snvs_high_scores AbSplice_DNA_hg38_snvs_high_scores_v1
+wget 'https://zenodo.org/records/10781457/files/AbSplice_DNA_hg38_snvs_high_scores.zip'
+mv AbSplice_DNA_hg38_snvs_high_scores.zip\?download\=1 AbSplice_DNA_hg38_snvs_high_scores.zip
+unzip AbSplice_DNA_hg38_snvs_high_scores.zip
+
+# Unpacks in per-gene files (gencode v38) in three directories, with score_cutoffs 0.01, 0.05 and 0.2
+# using the lowest cutoff (most files) for this track
+
+# the files have coordinates and gene IDs but not strand info, and I want to add this to the track
+wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gff3.gz
+zcat gencode.v38.annotation.gff3.gz | grep -P '\tgene\t' | cut -f7,9 | sed 's/ID=.*gene_id=//' | \
+	sed 's/\..*gene_name=/\t/' | sed 's/;.*//' > gene.strands
 
 # we have to loop over the files because they have different numbers of columns.
 # the info we want is in the (per-tissue) columns starting with ABSplice_DNA_
@@ -25,9 +25,6 @@ import os
 import csv
 import gzip
 from multiprocessing import Pool
-import sys
-
-sys.exit()
 
 indir='/hive/data/genomes/hg38/bed/absplice/AbSplice_DNA_hg38_snvs_high_scores/score_cutoff=0.01'
 outbase='AbSplice'
@@ -124,34 +121,34 @@ END
 # duplicates happen when genes overlap, e.g. chr9:136,741,919-136,741,924
 # when this happens we want to display only the higher score
 # sort, then filter for duplicates
-###sort -k1,1 -k2,2n AbSplice.ab.bed | /cluster/home/jeltje/miniconda3/bin/python3.11 <(
-###    cat << "END"
-###import sys
-###
-###printline = False
-###prevcoord = '0'
-###prevallele = False
-###hiscore = 0
-###for line in sys.stdin:
-###    fields = line.split('\t')
-###    score = float(fields[11])
-###    # check if startpos and name (alleles) are identical
-###    if fields[1] == prevcoord and fields[3] == prevallele:
-###        if score > hiscore:
-###            hiscore = score
-###            printline = line
-###    # if not identical, print the previous line and start over
-###    else:
-###        if printline:
-###            print(printline, end='')
-###        printline = line
-###        prevcoord = fields[1]
-###        prevallele = fields[3]
-###        hiscore = score
-###    print(printline, end='')
-###END
-###) > filtered.ab.bed
-###
+sort -k1,1 -k2,2n AbSplice.ab.bed | /cluster/home/jeltje/miniconda3/bin/python3.11 <(
+    cat << "END"
+import sys
+
+printline = False
+prevcoord = '0'
+prevallele = False
+hiscore = 0
+for line in sys.stdin:
+    fields = line.split('\t')
+    score = float(fields[11])
+    # check if startpos and name (alleles) are identical
+    if fields[1] == prevcoord and fields[3] == prevallele:
+        if score > hiscore:
+            hiscore = score
+            printline = line
+    # if not identical, print the previous line and start over
+    else:
+        if printline:
+            print(printline, end='')
+        printline = line
+        prevcoord = fields[1]
+        prevallele = fields[3]
+        hiscore = score
+print(printline, end='')
+END
+) > filtered.ab.bed
+
 # Create custom as file for this bigBed:
 cat << '_EOF_' > AbSplice.as
 table abSplice
