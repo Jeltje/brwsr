@@ -1,5 +1,5 @@
 table abSplice
-"Bed 9+3 file with Ensembl Gene IDs and ABsplice values per tissue."
+"Bed 9+5 file with Ensembl Gene IDs and ABsplice values per tissue."
     (
     string chrom;      "Chromosome (or contig, scaffold, etc.)"
     uint   chromStart; "Start position in chromosome"
@@ -11,6 +11,8 @@ table abSplice
     uint thickEnd;     "End of where display should be thick (stop codon)"
     uint reserved;     "Used as itemRgb as of 2004-11-22"
     string ENSGid;     "Ensembl Gene ID"
-    lstring topVals;   "Top values and their tissues"
-    lstring tissues;   "All 48 GTEX tissues with ABSplice value (empty if none were provided)" 
+    string hugoId;     "hugo Gene ID"
+    float spliceABscore; "AbSplice highest score for this position"
+    lstring maxScore;   "All tissues containing the highest score"
+    lstring tissues;   "All 49 GTEX tissues with ABSplice value (empty if none were provided)"
     )
