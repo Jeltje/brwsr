@@ -64,6 +64,10 @@ def process_gzipped_file(file_path, outAB, strands):
                 continue
             # Get the index and value for each column in indices_to_keep
             all_values = [(header[i], row[header[i]]) for i in indices_to_keep]
+
+            # In this (but not the previous) version of the data, the final value is AbSplice_DNA_max
+            max_value = float(all_values.pop()[1]) # remove from list
+
             # turn this information into a html table
             html_table = '<table>'
             for tvals in all_values:
@@ -72,7 +76,6 @@ def process_gzipped_file(file_path, outAB, strands):
 
             # Find the top 10% maximum values (first make sure all row entries are floats)
             all_values = [(x, float(y) if y else 0) for x, y in all_values]
-            max_value = max(all_values, key=lambda x: x[1])[1]
             if max_value == 0:
                 topValString = 'No tissues with scores > 0'
             else:
