@@ -1,0 +1,6 @@
+hub encode4
+shortLabel encode4 hub
+longLabel encode4 hub
+genomesFile genomes.txt
+email jeltje@soe.ucsc.edu
+descriptionUrl hg38/description.html

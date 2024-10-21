@@ -1,0 +1,63 @@
+#! /bin/bash
+
+# file (received by MarkD through email 12 May 2024):
+# /hive/data/genomes/hg38/bed/pseudoPipe/Homo_sapiens.GRCh38.103.pseudogene.pseudopipe.wparent.gtf
+# This is incorrectly formatted gtf because it has overlapping exons. The python code converts
+# the gtf to bed using MarkD's pycbio code, which can be pip installed:
+#python3 -m venv mytestvenv
+#source mytestvenv/bin/activate
+#pip install /hive/groups/browser/pycbio
+# the program also merges overlapping exons when they're in the same transcript because
+# the gtf we received contains those.
+
+# Adding HUGO ids using gencode tables.
+# The majority of gene IDs are
+# in all three of v41, v42, v43 but the rest comes from any number of earlier versions
+#rm all.ids
+for i in $(seq 29 46); do
+       echo "select * from hg38.wgEncodeGencodeGeneSymbolV$i" | hgsql -N >> all.ids
+done
+## remove 3rd field and .1 etc ENST extensions
+awk '{print $1, $2}' all.ids | sed 's/\.[0-9]*//' | sort -u > gene.names
+
+outdir='.'
+annotationFile='/hive/data/genomes/hg38/bed/pseudoPipe/Homo_sapiens.GRCh38.103.pseudogene.pseudopipe.wparent.gtf'
+
+cat << '_EOF_' > $outdir/pseudopipe.as
+table pseudopipe
+"Bed 12+6 file with pseudogenes and their (gene, transcript, and protein) parents."
+    (
+    string chrom;      "Chromosome (or contig, scaffold, etc.)"
+    uint   chromStart; "Start position in chromosome"
+    uint   chromEnd;   "End position in chromosome"
+    string name;       "Name of item"
+    uint   score;      "Score from 0-1000"
+    char[1] strand;    "+ or -"
+    uint thickStart;   "Start of where display should be thick (start codon)"
+    uint thickEnd;     "End of where display should be thick (stop codon)"
+    uint reserved;     "Used as itemRgb as of 2004-11-22"
+    int blockCount;    "Number of blocks"
+    int[blockCount] blockSizes;  "Comma separated list of block sizes"
+    int[blockCount] chromStarts; "Start positions relative to chromStart"
+    string pptranscript;        "Pseudopipe transcript ID"
+    string hugo;                "Parent gene"
+    string pgeneType;           "pseudogene, processed_pseudogene, unprocessed_pseudogene"
+    string ppgene;               "Pseudopipe gene ID"
+    string gene;                "Gene ID"
+    string geneParent;          "Gene parent ID"
+    string transcriptParent;    "Transcript parent ID"
+    string proteinParent;       "Protein parent ID"
+    )
+_EOF_
+# file has duplicate lines. Remove without sorting
+awk '!seen[$0]++' $annotationFile > uniq.gtf
+./pseudopipeToBed.py --genes gene.names --gtf uniq.gtf --bed pgene.bed
+bedSort pgene.bed pgene.bed
+bedToBigBed -type=bed12+6 -tab -as=pseudopipe.as -extraIndex=hugo,name,ppgene pgene.bed /hive/data/genomes/hg38/chrom.sizes $outdir/pseudopipe.bb
+# trix index (make search case insensitive) for hugo and ENSG parent IDs 
+cut -f4,14,18 pgene.bed > name.table
+ixIxx name.table $outdir/pseudopipe.ix $outdir/pseudopipe.ixx
+
+rm name.table pgene.bed gene.names uniq.gtf all.ids
+
+

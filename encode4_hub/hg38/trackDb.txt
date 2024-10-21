@@ -1,0 +1,11 @@
+track encode4_tx
+shortLabel encode4 transcripts
+longLabel encode4 Long read transcripts 
+type bigBed 12 +
+bigDataUrl encode4_tx.bb
+visibility pack
+itemRgb on
+#group genes
+html encode4Super
+mouseOver $name <br> $maxScore
+

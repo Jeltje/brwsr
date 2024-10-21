@@ -1,0 +1,14 @@
+track spliceAI
+shortLabel spliceAI
+longLabel spliceAI
+type bigBed 9 +
+bigDataUrl spliceAI.bb
+visibility pack
+itemRgb on
+noScoreFilter on
+filterValues.spliceType donor_gain,donor_loss,acceptor_gain,acceptor_loss
+filterLabel.spliceType splice type
+filter.AIscore 0.02
+filterLimits.AIscore 0.02:1
+html description.html
+mouseOver change: $name <br> gene: $gene <br> type of change: $spliceType <br> affected splice located at: $relativePos <br> score: $AIscore

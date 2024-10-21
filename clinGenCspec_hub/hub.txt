@@ -1,0 +1,6 @@
+hub clinGenCspec
+shortLabel clinGenCspec hub
+longLabel clinGen CSPEC scores hub
+genomesFile genomes.txt
+email jeltje@soe.ucsc.edu
+descriptionUrl hg38/description.html

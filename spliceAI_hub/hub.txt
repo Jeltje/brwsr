@@ -1,0 +1,6 @@
+hub spliceAI
+shortLabel spliceAI hub
+longLabel spliceAI hub
+genomesFile genomes.txt
+email jeltje@soe.ucsc.edu
+descriptionUrl hg38/description.html

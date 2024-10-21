@@ -1,0 +1,36 @@
+hubDir='/cluster/home/jeltje/public_html/trackHubs/encode4_hub/hg38/'
+
+gtfFile='ENCSR957LMA/ENCFF232ABR.gtf.gz'
+quantFile='ENCSR957LMA/ENCFF139IUH.tsv'
+./gtfToBed.py $gtfFile $quantFile transcripts.bed
+bedSort transcripts.bed transcripts.bed 
+bedToBigBed -type=bed12+7 -as=encode4_tx.as -tab transcripts.bed /hive/data/genomes/hg38/chrom.sizes $hubDir/encode4_tx.bb
+
+
+exit
+tssFile='ENCSR957LMA/ENCFF842DHB.bed.gz'
+polyAfile='ENCSR957LMA/ENCFF879XIF.bed.gz'
+bedSort decorators.bed decorators.bed
+bedToBigBed -type=bed6+5 -as=encode4_decorators.as -tab decorators.bed /hive/data/genomes/hg38/chrom.sizes $hubDir/encode4_decorators.bb
+exit
+
+#transcriptts
+./gtfToBed.py ENCSR957LMA/ENCFF232ABR.gtf.gz transcripts.bed 
+bedSort transcripts.bed transcripts.bed
+bedToBigBed -type=bed12+5 -as=encode4_tx.as -tab transcripts.bed /hive/data/genomes/hg38/chrom.sizes $hubDir/encode4_tx.bb
+exit
+#polyA and TSS
+chroms=( "chr1" "chr2" "chr3" "chr4" "chr5" "chr6" "chr7" "chr8" "chr9" "chr10" "chr11" "chr12" "chr13" "chr14" "chr15" "chr16" "chr17" "chr18" "chr19" "chr20" "chr21" "chr22" "chrX" "chrY")
+pattern=$(IFS=\|; echo "^(${chroms[*]})$")
+zcat ENCSR957LMA/ENCFF842DHB.bed.gz | \
+	awk -F'\t' -v pattern="$pattern" '$1 ~ pattern'  | \
+	sed 's/	\.	/	0	/' > tss.bed
+bedSort tss.bed tss.bed
+bedToBigBed -type=bed6+2 -as=encode4_ends.as -tab tss.bed /hive/data/genomes/hg38/chrom.sizes $hubDir/encode4_tss.bb
+zcat ENCSR957LMA/ENCFF879XIF.bed.gz | \
+	awk -F'\t' -v pattern="$pattern" '$1 ~ pattern'  | \
+	sed 's/	\.	/	0	/' | cut -f1-8 > polyA.bed
+bedSort polyA.bed polyA.bed
+bedToBigBed -type=bed6+2 -as=encode4_ends.as -tab polyA.bed /hive/data/genomes/hg38/chrom.sizes $hubDir/encode4_polyA.bb
+exit
+

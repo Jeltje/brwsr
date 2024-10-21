@@ -1,0 +1,9 @@
+track clinGenCspec
+shortLabel ClinGen VCEP specifications
+longLabel Clingen CSPEC variant interpretation VCEP specifications
+type bigBed 9 +
+bigDataUrl clinGenCspec.bb
+visibility pack
+itemRgb on
+html description.html
+mouseOver $disease <br> $panel <br> status: $status
