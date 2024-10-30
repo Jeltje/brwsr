@@ -1,0 +1,10 @@
+track ncbiOrtho
+shortLabel ncbiOrtho
+longLabel NCBI orthologs
+type bigBed 5 +
+bigDataUrl ncbiOrtho.bb
+visibility pack
+itemRgb on
+html description.html
+#mouseOver $name <br> $maxScore
+
