@@ -1,10 +1,12 @@
 track ncbiOrtho
 shortLabel ncbiOrtho
 longLabel NCBI orthologs
-type bigBed 5 +
-bigDataUrl ncbiOrtho.bb
+type bigBed 9 +
+bigDataUrl ncbiOrtho2.bb
 visibility pack
+labelFields hugo, name
+defaultLabelFields hugo
 itemRgb on
 html description.html
-#mouseOver $name <br> $maxScore
+mouseOver $url
 

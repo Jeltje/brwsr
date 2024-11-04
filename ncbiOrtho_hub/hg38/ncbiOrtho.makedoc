@@ -1,0 +1,50 @@
+# based on /cluster/home/jeltje/kent/src/hg/makeDb/doc/hg38/hgnc.txt
+
+#zcat ncbi_dwnld/gene_orthologs.gz | awk '$1 == 9606 && $4 == 10090' > humVsMouse.ortho
+# we now need to get human and mouse genome coordinates and gene names
+#zcat ncbi_dwnld/gene2accession.gz | grep "^9606" >  human.gene2accession &
+#zcat ncbi_dwnld/gene2accession.gz | grep "^10090" >  mouse.gene2accession
+#wait
+
+# the chrom IDs in these files are NC_ something, so convert first
+# remove all nonstandard chromosomes
+# human
+#tawk '$2 !~ /_/ { print $1, $2 }' /cluster/data/hg38/hg38.chromAlias.tsv > ncbiHumToUcsc.map
+#subColumn -skipMiss -miss=idMiss.txt 8 human.gene2accession ncbiHumToUcsc.map humToLoc.txt
+# mouse
+#bigBedToBed /gbdb/mm39/mm39.chromAlias.bb mousechr.bed
+#tawk '$1 !~ /_/ { print $8, $1 }' mousechr.bed > ncbiMusToUcsc.map
+#subColumn -skipMiss -miss=idMiss.txt 8 mouse.gene2accession ncbiMusToUcsc.map musToLoc.txt
+
+# now get only the ortho genes from those two files (get header)
+#zcat ncbi_dwnld/gene2accession.gz | head -n 1 > humOrtho.genes
+#cp humOrtho.genes musOrtho.genes
+#selectById 2 humVsMouse.ortho 2 humToLoc.txt >> humOrtho.genes 
+#selectById 5 humVsMouse.ortho 2 musToLoc.txt >> musOrtho.genes 
+
+./mergeGenes.py 
+bedSort humOrtho.bed humOrtho.bed
+bedSort musOrtho.bed musOrtho.bed
+cat << '_EOF_' > ortho.as
+table orthologs
+"Bed 9+3 file for NCBI orthologs"
+    (
+    string chrom;      "Reference sequence chromosome or scaffold"
+    uint   chromStart; "Start position in chromosome"
+    uint   chromEnd;   "End position in chromosome"
+    string name;       "Short Name of item"
+    uint   score;      "Score from 0-1000"
+    char[1] strand;    "+ or -"
+    uint thickStart;   "Start of where display should be thick (start codon)"
+    uint thickEnd;     "End of where display should be thick (stop codon)"
+    uint reserved;     "Used as itemRgb as of 2004-11-22"
+    string hugo;       "gene symbol"
+    lstring url;       "urls to orthologs"
+    string ortho;      "ortholog symbol"
+    )
+_EOF_
+bedToBigBed -type=bed9+3 -tab -as=ortho.as humOrtho.bed /hive/data/genomes/hg38/chrom.sizes ncbiOrtho2.bb
+bedToBigBed -type=bed6+3 -tab -as=ortho.as musOrtho.bed /hive/data/genomes/hg38/chrom.sizes musOrtho.bb
+
+
+
