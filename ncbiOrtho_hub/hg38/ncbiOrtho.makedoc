@@ -1,13 +1,13 @@
 #! /bin/bash
 
 #rm -rf field1 field2
-#for species in dm6 danRer11 bosTau9 felCat9 mm39 hg38; do
-#	bigBedToBed /gbdb/$species/$species.chromAlias.bb $species.bed
-##	#head -n2 $species.bed # mm39 and hg38 have 8 fields instead of 7
-#	tawk '{print $NF}' $species.bed >> field1
-#	tawk '{print $1}' $species.bed >> field2
-#	rm $species.bed
-#done
+for species in dm6 danRer11 bosTau9 felCat9 mm39 hg38; do
+	bigBedToBed /gbdb/$species/$species.chromAlias.bb $species.chrom.bed
+##	#head -n2 $species.chrom.bed # mm39 and hg38 have 8 fields instead of 7
+#	tawk '{print $NF}' $species.chrom.bed >> field1
+#	tawk '{print $1}' $species.chrom.bed >> field2
+#	rm $species.chrom.bed
+done
 #paste field1 field2 | grep -vP '\t$' > want.chroms
 # 4 empties, chr_alt, Un and random without NCBI IDs
 #rm field1 field2
@@ -19,9 +19,8 @@
 # cut -f1 accession.info | sort -u
 ## replace with UCSC IDs
 #subColumn -skipMiss -miss=idMiss.txt 8 accession.info want.chroms accToLoc.txt
-head -n1 gene2accession.txt > gene2ucscAccession.txt
-cat accToLoc.txt >> gene2ucscAccession.txt
+#head -n1 gene2accession.txt > gene2ucscAccession.txt
+#cat accToLoc.txt >> gene2ucscAccession.txt
 
-# we could subset gene_orthologs with these gene IDs, but let's see how slow it is.
 #
 

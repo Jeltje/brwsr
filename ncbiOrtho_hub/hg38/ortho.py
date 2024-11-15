@@ -7,35 +7,111 @@ from collections import namedtuple
 sys.path.append('/hive/groups/browser/pycbio/lib')
 from pycbio.hgdata.bed import Bed, BedBlock, BedReader, intArraySplit
 
+class Gene(object):
+    def __init__(self, geneID, orthos):
+        if orthos == []:
+            print('want to create empty list for', geneID)
+            sys.exit()
+        self.geneID = geneID
+        self.orthoList = orthos
+    def coordAdd(self, genStart, genStop, representativeRow):
+        self.genStart = genStart
+        self.genStop = genStop
+        self.taxID = representativeRow['#tax_id']
+        self.symbol = representativeRow['Symbol']
+        self.tx = representativeRow['RNA_nucleotide_accession.version']
+        self.chrom = representativeRow['genomic_nucleotide_accession.version']
+        self.name = representativeRow['Symbol']
+        self.strand = representativeRow['orientation']
+    def makeHtml(self, speciesDict, geneDict, blacklist):
+        '''Turn coordinate info for ortholog genes into html'''
+        # hgTracks?db=hg38&position=chr7:155799980-155812463&knownGene=pack
+        self.orthoList = [gene for gene in self.orthoList if gene not in blacklist]
+        self.url = ''
+        baselink = '{species}:<a href="hgTracks?db={genome}&position={chrom}:{start}-{end}&knownGene=pack">{symbol}</a><br>'
+        for geneName in self.orthoList:
+             if geneName in geneDict:
+                 gene = geneDict[geneName]
+                 org = speciesDict[gene.taxID]
+                 self.url += baselink.format(species=org.colloq, genome=org.ucsc, chrom=gene.chrom, start=gene.genStart, end=gene.genStop, symbol=gene.symbol)
+    def write(self, outf):
+        '''Create bed object and print'''
+        bedObj = Bed(self.chrom, self.genStart, self.genStop, name=self.geneID, strand=self.strand,
+                 score='0', numStdCols=9, extraCols=[self.name, self.url])
+        bedObj.write(outf)
 
 
-def makeGenesFromTx(infile, orthoDict):
-    '''Extract gene symbols and create gene boundary blocks from multiple lines''' 
+def getOrtholine(infile, speciesDict):
+    '''Generator that returns csv lines that match species of interest'''
     with open(infile, 'r') as f:
-        reader = csv.DictReader(f,  delimiter='\t')
-        someRows = [next(reader)]
-        prevID = someRows[0]['GeneID']
-        geneObjDict = dict()
+        reader = csv.DictReader(f, delimiter='\t')
         for row in reader:
-            # collect lines until we reach a  new gene
-            if row['GeneID'] != prevID:
-                 if prevID in orthoDict:
-                     # make a gene object with the ortholog IDs added
-                     geneObj = makeGeneObject(someRows, orthoDict[prevID])
-                     geneObjDict[prevID] = geneObj
-                 prevID = row['GeneID']
-                 someRows = []
-            someRows.append(row)
-        # add the final gene
-        if prevID in orthoDict:
-            geneObj = makeGeneObject(someRows, orthoDict[prevID])
-            geneObjDict[prevID] = geneObj
-        return geneObjDict   
-    
+            # Only yield rows where the tax IDs are in speciesDict
+            if row['#tax_id'] in speciesDict and row['Other_tax_id'] in speciesDict:
+                yield row
 
-def makeGeneObject(rows, orthoList):
-    '''From a set of rows for one gene, get the best representatives, genome accession, location, and symbol'''
-    returnObjects = dict()
+
+def makeOrthoSets(infile, speciesDict):
+    '''Collect sets of orthologs of interest and make all vs all combinations'''
+    orthoRows = []  # This will store rows for the current gene
+    prevID = None   # To track the previous GeneID
+    geneObjDict = dict()
+
+    # Iterate over rows from the generator
+    for row in getOrtholine(infile, speciesDict):
+        if prevID is not None and row['GeneID'] != prevID:
+            # Process collected rows when a new gene is encountered
+            gene_ids = [prevID] + [r['Other_GeneID'] for r in orthoRows]  # Collect all GeneIDs in the current set
+            for gene in gene_ids:
+                # Create Gene objects with the current set of orthologs
+                geneObj = Gene(geneID=gene, orthos=[g for g in gene_ids if g != gene])
+                geneObjDict[gene] = geneObj
+            # Clear the orthoRows for the next gene
+            orthoRows = []
+        # Add the current row to orthoRows
+        orthoRows.append(row)
+        prevID = row['GeneID']  # Update prevID to the current GeneID
+    # After the loop, process the last set of rows (if any)
+    if orthoRows:
+        gene_ids = [r['Other_GeneID'] for r in orthoRows]
+        for gene in gene_ids:
+            geneObj = Gene(geneID=gene, orthos=[g for g in gene_ids if g != gene])
+            geneObjDict[gene] = geneObj
+    return geneObjDict
+
+def getGene(infile, geneList):
+    '''Generator that returns csv lines that match genes of interest'''
+    with open(infile, 'r') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            if row['GeneID'] in geneList:
+                yield row
+
+def addCoords(infile, geneList):
+    '''Parse the gene_accession file: from a list of gene rows get the best representatives, 
+    genome accession, location, and symbol and add it to the corresponding gene objects'''
+    #Extract gene symbols and create gene boundary blocks from multiple lines
+    txRows = []  # This will store rows for the current gene
+    prevID = None   # To track the previous GeneID
+    # Iterate over rows from the generator
+    for row in getGene(infile, geneList):
+        if prevID is not None and row['GeneID'] != prevID:
+            # Process collected rows when a new gene is encountered
+            addGeneInfo(geneList[prevID], txRows)
+            # Clear the txRows for the next gene
+            txRows = []
+        # Add the current row to orthoRows
+        txRows.append(row)
+        prevID = row['GeneID']  # Update prevID to the current GeneID
+    # process final set
+    if txRows:
+        addGeneInfo(geneList[prevID], txRows)
+
+
+def addGeneInfo(geneObj, rows):
+    '''From a set of rows for one gene, get the best representatives, genome accession, location, 
+     and symbol; add this to the gene object'''
+    #returnObjects = dict()
     best = ['REVIEWED', 'VALIDATED', 'PROVISIONAL', 'INFERRED']
     ok = ['PREDICTED', 'MODEL']
     selected = []
@@ -56,41 +132,10 @@ def makeGeneObject(rows, orthoList):
         # be aware we're only taking starts and stops of the best set, not of all tx
         genStart = min([int(row['start_position_on_the_genomic_accession']) for row in subselect])
         genStop = max([int(row['end_position_on_the_genomic_accession']) for row in subselect])
-        geneObject = Gene(genStart, genStop, subselect[0], orthoList)
-    # can only do this if we fix duplicate IDs, hm
-        #returnObjects[subselect['GeneID']] = geneObject
-        # for now just return when we have one
-        return geneObject
+        geneObj.coordAdd(genStart, genStop, subselect[0])
 
-class Gene(object):
-    '''Hold coordinate, ortholog, and species info per gene'''
-    def __init__(self, genStart, genStop, representativeRow, orthoList):
-        self.genStart = genStart
-        self.genStop = genStop
-        self.geneID = representativeRow['GeneID']
-        self.orthoList = orthoList
-        self.taxID = representativeRow['#tax_id']
-        self.symbol = representativeRow['Symbol']
-        self.tx = representativeRow['RNA_nucleotide_accession.version']
-        self.chrom = representativeRow['genomic_nucleotide_accession.version']
-        self.name = representativeRow['Symbol']
-        self.strand = representativeRow['orientation']
-    def makeHtml(self, speciesDict, geneDict):
-        '''Turn coordinate info for ortholog genes into html'''
-        # hgTracks?db=hg38&position=chr7:155799980-155812463&knownGene=pack
-        self.url = ''
-        baselink = '{species}:<a href="hgTracks?db={genome}&position={chrom}:{start}-{end}&knownGene=pack">{symbol}</a><br>'
-        for geneName in self.orthoList:
-             if geneName in geneDict:
-                 gene = geneDict[geneName]
-                 org = speciesDict[gene.taxID]
-                 self.url += baselink.format(species=org.colloq, genome=org.ucsc, chrom=gene.chrom, start=gene.genStart, end=gene.genStop, symbol=gene.symbol)
-    def write(self, outf):
-        '''Create bed object and print'''
-        bedObj = Bed(self.chrom, self.genStart, self.genStop, name=self.geneID, strand=self.strand,
-                 score='0', numStdCols=9, extraCols=[self.name, self.url])
-        bedObj.write(outf)
 
+# Main
 # get tax_id, ucsc name and common name for each species we want tracks for
 # we're making all vs all tracks
 speciesDict = dict()
@@ -100,34 +145,36 @@ with open('species.list', 'r') as f:
         ncbi, colloq, ucsc = line.strip().split('\t')
         speciesDict[ncbi] = species(colloq, ucsc)
 
-# gene IDs are unique, you don't need to keep the species. So it's a matter of keeping pairs
-# we want to capture forward and reverse matches because they're not symmetrical
-# meaning there are mouse-human matches that are not in human-mouse
-orthoDict = dict()
-with open('gene_orthologs', 'r') as f:
-#with open('test_orthologs', 'r') as f:
-    reader = csv.DictReader(f,  delimiter='\t')
-    for row in reader:
-        if row['#tax_id'] in speciesDict and row['Other_tax_id'] in speciesDict:
-            if not row['GeneID'] in orthoDict:
-                orthoDict[row['GeneID']] = set()
-            orthoDict[row['GeneID']].add(row['Other_GeneID'])
-            if not row['Other_GeneID'] in orthoDict:
-                orthoDict[row['Other_GeneID']] = set()
-            orthoDict[row['Other_GeneID']].add(row['GeneID'])
+# parse the ortholog file and create gene objects that have a gene ID and a set of orthologs
+orthofile = 'gene_orthologs'
+geneDict = makeOrthoSets(orthofile, speciesDict)
+
+# geneDict has a gene ID as key and a gene Object as value
+# now we know which genes we want, extract their coordinate info and add
+coordFile = 'gene2ucscAccession.txt'
+addCoords(coordFile, geneDict)
+
+#import inspect
+#for gene in geneDict:
+#  for name, value in inspect.getmembers(geneDict[gene]):
+#    if not name.startswith('__') and not callable(value):
+#        print(f"{name}: {value}") 
+#  sys.exit()
+
+# sanity check
+# blacklist the genes for which we didn't find info
+blacklist = [k for k, v in geneDict.items() if getattr(v, 'taxID', None) is None]
+print('There are', len(blacklist), 'genes without genome info', file=sys.stderr)
+# remove these from the set (the blacklist is needed for orthologs)
+geneDict = {k: v for k, v in geneDict.items() if getattr(v, 'taxID', None) is not None}
 
 
-# now we know which genes we want, get their coordinate info
-# add their ortholog set while we're at it
-geneDict = makeGenesFromTx('gene2ucscAccession.txt', orthoDict)
- 
 # for each organism, print a bed file
 for tax_id in speciesDict:
     organism = speciesDict[tax_id]
     organismGenes = {k:v for k, v in geneDict.items() if v.taxID == tax_id}
     outf = open(f'{organism.ucsc}.bed', 'w')
     for gene in organismGenes.values():
-        gene.makeHtml(speciesDict, geneDict)
-        print(gene.url)
+        gene.makeHtml(speciesDict, geneDict, blacklist)
         gene.write(outf)
     outf.close()
