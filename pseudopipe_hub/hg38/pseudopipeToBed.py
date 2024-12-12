@@ -15,7 +15,7 @@ def main():
 Converts gtf to bed format.
 
         '''))
-	parser.add_argument('--genes', type=str, help='ENST and hugo gene IDs')
+	parser.add_argument('--genes', type=str, help='ENST, ENSP, and hugo gene IDs')
 	parser.add_argument('--gtf', type=str, required=True, default=None,  help="annotation gtf")
 	parser.add_argument('--bed', type=str, required=True, default=None,  help="output bedfile")
 	args = parser.parse_args()
@@ -23,8 +23,15 @@ Converts gtf to bed format.
 	gdict = dict()
 	with open(args.genes, 'r') as g:
 		for line in g:
-			tx, gene = line.strip().split(" ")
-			gdict[tx] = gene
+			ensg, gene, enst, ensp = line.split("\t")
+			#tx, gene = line.strip().split(" ")
+			#gdict[enst.split('.')[0]] = gene # don't need tx
+			ensg = ensg.split('.')[0]
+			gdict[ensg] = gene
+			ensp = ensp.strip()
+			if ensp != '':
+				gdict[ensp.split('.')[0]] = [gene, ensg]
+                    
 	g.close()
 	gtf_to_bed(args.bed, args.gtf, gdict)
 
@@ -34,9 +41,6 @@ class Gene(object):
 		self.itemRgb = itemRgb
 		self.txID = tx
 		self.chrom = chrom
-		# replace this misguided CHR_ otherwise we can't run chromToUcsc
-		if chrom.startswith('CHR_'):
-			self.chrom = re.sub('CHR_', '', chrom)
 		self.geneStart = start
 		self.geneEnd = end
 		self.strand = strand
@@ -76,16 +80,31 @@ def ids_from_gtf(descrField, gdict):
 	data_dict = {pair.split(" ", 1)[0].strip(): pair.split(" ", 1)[1].strip('"') for pair in pairs}
 	# gene_id, transcript_id, gene_type, transcript_type, gene_ens_id, transcript_ens_id, gene_ens_id, gene_parent_id, transcript_parent_id, protein_parent_id
 	# note: data_dict['gene_type'] is always identical data_dict['transcript_type'], I checked.
+	#del data_dict['transcript_parent_id']
 	hugo = 'NA'
-	if data_dict['transcript_parent_id'] in gdict:
-		hugo = gdict[data_dict['transcript_parent_id']]
+	if data_dict['gene_parent_id'] in gdict:
+		hugo = gdict[data_dict['gene_parent_id']]
+	# in some cases the transcript and gene parents are NA
+	elif data_dict['protein_parent_id'] in gdict:
+		[hugo, ensg]  = gdict[data_dict['protein_parent_id']]
+		# replace ensg parent with current
+		# TODO: drop transcript parent ID
+		data_dict['gene_parent_id'] = ensg
+
+	#if hugo == 'NA':
+	#	print(data_dict['gene_parent_id'], data_dict['protein_parent_id'])
+	# 535 transcripts truly don't have parents so some remain NA
 	itemRgb = '255,140,0' # dark orange (pseudogene)
 	if data_dict['gene_type'] == 'unprocessed_pseudogene':
 		itemRgb = '0,0,255' # blue
 	elif data_dict['gene_type'] == 'processed_pseudogene':
 		itemRgb = '85,107,47' # dark olive green 
-	extrafields = tuple([hugo, data_dict['gene_type'], data_dict['gene_id'], data_dict['gene_ens_id'], data_dict['gene_parent_id'], 
-		data_dict['transcript_parent_id'], data_dict['protein_parent_id']])
+	# drop transcript parent because we might have changed the gene parent
+	# add an empty placeholder to put the link to parent (in the parent script)
+	# note that we prepend a field later, so url (parent not listed) becomes the 6th item
+	extrafields = tuple([hugo, data_dict['gene_type'], data_dict['gene_id'],  
+		data_dict['gene_ens_id'], 'parent not listed', data_dict['gene_parent_id'], 
+		data_dict['protein_parent_id']])
 	return itemRgb, data_dict['transcript_id'], extrafields
 
 
@@ -104,9 +123,10 @@ def gtf_to_bed(outputfile, gtf, gdict):
 			chrom, ty, start, end, strand = line[0], line[2], int(line[3]) - 1, int(line[4]), line[6]
 			if ty in ['gene', 'transcript', 'UTR', 'start_codon']:
 				continue
-			if not chrom in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y']:
-				continue 
-			chrom = 'chr'+ chrom
+			# ensembl integrates the chromosome in the ALT and HAP files, we do not
+			# so skip these (fortunately they all start with CHR_)
+			if chrom.startswith('CHR_'):
+				continue
 
 			itemRgb, tx, extrafields = ids_from_gtf(line[8], gdict)
 			if geneObj is None:

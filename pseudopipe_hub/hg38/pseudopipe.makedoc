@@ -11,19 +11,16 @@
 # the gtf we received contains those.
 
 # Adding HUGO ids using gencode tables.
-# The majority of gene IDs are
-# in all three of v41, v42, v43 but the rest comes from any number of earlier versions
-#rm all.ids
-for i in $(seq 29 46); do
-       echo "select * from hg38.wgEncodeGencodeGeneSymbolV$i" | hgsql -N >> all.ids
+# gene IDs come from v37 and v38 (both are needed to find all)
+rm -rf all.ids
+for i in 37 38; do
+       echo "select geneId, geneName, transcriptId, proteinId from hg38.wgEncodeGencodeAttrsV$i" | \
+          hgsql -N >> all.ids
 done
-## remove 3rd field and .1 etc ENST extensions
-awk '{print $1, $2}' all.ids | sed 's/\.[0-9]*//' | sort -u > gene.names
 
-outdir='.'
 annotationFile='/hive/data/genomes/hg38/bed/pseudoPipe/Homo_sapiens.GRCh38.103.pseudogene.pseudopipe.wparent.gtf'
 
-cat << '_EOF_' > $outdir/pseudopipe.as
+cat << '_EOF_' > pseudopipe.as
 table pseudopipe
 "Bed 12+6 file with pseudogenes and their (gene, transcript, and protein) parents."
     (
@@ -44,20 +41,59 @@ table pseudopipe
     string pgeneType;           "pseudogene, processed_pseudogene, unprocessed_pseudogene"
     string ppgene;               "Pseudopipe gene ID"
     string gene;                "Gene ID"
+    string parentUrl;            "Link to parent gene"
     string geneParent;          "Gene parent ID"
-    string transcriptParent;    "Transcript parent ID"
     string proteinParent;       "Protein parent ID"
     )
 _EOF_
 # file has duplicate lines. Remove without sorting
 awk '!seen[$0]++' $annotationFile > uniq.gtf
-./pseudopipeToBed.py --genes gene.names --gtf uniq.gtf --bed pgene.bed
-bedSort pgene.bed pgene.bed
-bedToBigBed -type=bed12+6 -tab -as=pseudopipe.as -extraIndex=hugo,name,ppgene pgene.bed /hive/data/genomes/hg38/chrom.sizes $outdir/pseudopipe.bb
-# trix index (make search case insensitive) for hugo and ENSG parent IDs 
-cut -f4,14,18 pgene.bed > name.table
-ixIxx name.table $outdir/pseudopipe.ix $outdir/pseudopipe.ixx
+./pseudopipeToBed.py --genes all.ids --gtf uniq.gtf --bed pgene.bed
 
-rm name.table pgene.bed gene.names uniq.gtf all.ids
+# change the chromosome IDs (they need to  match the parents)
+bigBedToBed /gbdb/hg38/hg38.chromAlias.bb chromAlias.bed
+tawk '{print $6, $1}' chromAlias.bed > sub.list
+subColumn 1 pgene.bed sub.list pgene2.bed
+
+bedSort pgene2.bed pgene.bed
+
+
+
+########## PARENT TRACK ######################
+# Create a parent track and add parent info to the children
+
+### V37
+# we only need the chrom coords, not the blocks
+zcat /hive/data/genomes/hg38/bed/gencodeV37/build/gencodeV37.bed.gz | cut -f1-6 > v37.tsv
+
+# these have ENST IDs but not gene IDs
+# replace with gene IDs (note that this creates duplicate IDs in the file)
+paste <(cut -f3 all.ids) <(cut -f1 all.ids | cut -f1 -d'.') > sub.me
+subColumn -miss=idMiss.txt 4 v37.tsv sub.me v37.sub
+#grep -c ENST v37.sub # 0
+
+### V38
+bigBedToBed /hive/data/genomes/hg38/bed/gencodeV38/build/hg38.gencodeV38.bb V38.bed
+subColumn -miss=idMiss.txt 4 <(cut -f1-6 V38.bed) sub.me v38.sub
+#grep -c ENST v38.sub # 0
+
+# we really only want v37 genes if they are not in v38
+selectById -not 4 v38.sub 4 v37.sub > addMe
+# sort by gene ID, then chr
+cat v38.sub addMe  | sort -k4 -k1 > annot.bed
+
+./parents.py --pgenebed pgene.bed --annotbed annot.bed --pgeneout pseudopipePgenes.bed --parentout pseudopipeParents.bed
+bedToBigBed -type=bed12+8 -tab -as=pseudopipe.as -extraIndex=hugo,name,ppgene pseudopipePgenes.bed /hive/data/genomes/hg38/chrom.sizes pseudopipePgenes.bb
+bedSort pseudopipeParents.bed pseudopipeParents.bed
+bedToBigBed -type=bed9+1 -tab pseudopipeParents.bed /hive/data/genomes/hg38/chrom.sizes pseudopipeParents.bb
+
+rm addMe v37.tsv v38.sub V38.bed v37.sub sub.me sub.list idMiss.txt
+rm *.bed
+rm name.table uniq.gtf all.ids
+
+
+
+
+
 
 
