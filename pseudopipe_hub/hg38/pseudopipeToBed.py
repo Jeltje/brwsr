@@ -24,8 +24,6 @@ Converts gtf to bed format.
 	with open(args.genes, 'r') as g:
 		for line in g:
 			ensg, gene, enst, ensp = line.split("\t")
-			#tx, gene = line.strip().split(" ")
-			#gdict[enst.split('.')[0]] = gene # don't need tx
 			ensg = ensg.split('.')[0]
 			gdict[ensg] = gene
 			ensp = ensp.strip()
@@ -88,7 +86,6 @@ def ids_from_gtf(descrField, gdict):
 	elif data_dict['protein_parent_id'] in gdict:
 		[hugo, ensg]  = gdict[data_dict['protein_parent_id']]
 		# replace ensg parent with current
-		# TODO: drop transcript parent ID
 		data_dict['gene_parent_id'] = ensg
 
 	#if hugo == 'NA':

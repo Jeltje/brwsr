@@ -27,8 +27,7 @@ Maybe update pgenes bed with parent links.
 	# gene ID dict keeping track of starts and ends
 	ensgDict = dict()
 	curGene, start, end, curChr, strand = 'NA', 'NA', 'NA', 'NA', 'NA'
-	# TODO: change track ID
-	parentlink = '<a href="hgTracks?db=hg38&position={chrom}:{start}-{end}&knownGene=pack">{geneID}</a>'
+	parentlink = '<a href="hgTracks?db=hg38&position={chrom}:{start}-{end}&parents=pack">{geneID}</a>'
 	with open(args.annotbed, 'r') as INF:
 		for bedObj in BedReader(INF, numStdCols=6):
 			if bedObj.name == curGene:
@@ -69,7 +68,7 @@ Maybe update pgenes bed with parent links.
 
 			url = parentlink.format(chrom=parentTuple.chrom, start=parentTuple.start,
 				end=parentTuple.end, geneID=parent) 
-			bedObj.extraCols[4] = url
+			bedObj.extraCols[5] = url
 			bedObj.write(OUTF)
 	# now print parent track, adding one block per child for each parent
 	with open(args.parentout, 'w') as OUTF2:
@@ -86,22 +85,24 @@ class Gene(object):
 		self.geneEnd = parentTuple.end
 		self.strand = parentTuple.strand
 		self.children = [childObj]
+		self.symbol = childObj.extraCols[1]
 	def add(self, childObj):
 		self.children.append(childObj)
 	def write(self, FH):
 		'''Create parent and children Bed objects, and print them'''
 		parentColor = "128,0,128"   # Dark Purple
 		childColor = "255,140,0"   # Dark Orange
-		# TODO: replace knownGene with subtrack name
-		baselink = '<a href="hgTracks?db=hg38&position={chrom}:{start}-{end}&knownGene=pack">{geneID}</a>'
+		baselink = '<a href="hgTracks?db=hg38&position={chrom}:{start}-{end}&pseudogenes=pack">{geneID}</a>'
 		# let's make the parent wide and the children narrow
 		bedObj = Bed(self.chrom, self.geneStart, self.geneEnd, name=self.name, strand=self.strand, 
-		thickStart=self.geneStart, thickEnd=self.geneEnd, itemRgb=parentColor, numStdCols=9, extraCols=[])
+		thickStart=self.geneStart, thickEnd=self.geneEnd, itemRgb=parentColor, numStdCols=9, 
+		extraCols=[self.symbol, 'N/A'])
+		bedObj.write(FH)
 		for childObj in self.children:
 			url = baselink.format(chrom=childObj.chrom, start=childObj.start, 
 				end=childObj.end, geneID=childObj.name)
 			bedObj = Bed(self.chrom, self.geneStart, self.geneEnd, name=childObj.name, strand=self.strand, 
-			itemRgb=childColor, numStdCols=9, extraCols=[url])
+			itemRgb=childColor, numStdCols=9, extraCols=['', url])
 			bedObj.write(FH)
 
 

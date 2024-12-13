@@ -1,0 +1,44 @@
+track pseudopipe
+shortLabel PseudoPipe
+longLabel PseudoPipe pseudogenes and parents
+group genes
+visibility hide
+type bigbed
+compositeTrack on
+
+        track pseudogenes
+        shortLabel PseudoPipe pseudogenes
+        longLabel PseudoPipe pseudogenes
+        parent PseudoPipe on
+        type bigBed 12 +
+        bigDataUrl pseudopipePgenes.bb
+        visibility pack
+        itemRgb on
+        labelFields hugo
+        defaultLabelFields hugo
+        searchIndex hugo,name,ppgene
+        searchTrix pseudopipe.ix
+        labelSeparator " "
+        html description.html
+        mouseOver pseudopipe ID: ${ppgene} <br> parent Ensembl gene ID: ${parentUrl}
+	parent pseudopipe
+        priority 1
+
+	track parents
+	shortLabel PseudoPipe parents
+	longLabel PseudoPipe parents
+	parent PseudoPipe on
+	type bigBed 9 +
+	bigDataUrl pseudopipeParents.bb
+	visibility pack
+	itemRgb on
+        labelFields hugo
+	searchIndex hugo,name
+	searchTrix pseudopipeParents.ix
+	labelSeparator " "
+	html description.html
+	mouseOver ${url}
+	parent pseudopipe
+        priority 2
+
+
