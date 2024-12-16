@@ -75,14 +75,12 @@ table pseudopipePgenes
     int blockCount;    "Number of blocks"
     int[blockCount] blockSizes;  "Comma separated list of block sizes"
     int[blockCount] chromStarts; "Start positions relative to chromStart"
-    string pptranscript;        "Pseudopipe transcript ID"
-    string hugo;                "Parent gene"
+    string hugo;                "Pseudogene of"
     string pgeneType;           "pseudogene, processed_pseudogene, unprocessed_pseudogene"
-    string ppgene;               "Pseudopipe gene ID"
-    string gene;                "Gene ID"
-    string parentUrl;            "Link to parent gene"
-    string geneParent;          "Gene parent ID"
-    string proteinParent;       "Protein parent ID"
+    string ppgene;              "Pseudopipe pseudogene ID"
+    string gene;                "Ensembl pseudogene ID"
+    string geneParent;          "Ensembl gene parent ID (url)"
+    string proteinParent;       "Ensembl protein parent ID"
     )
 _EOF_
 bedToBigBed -type=bed12+8 -tab -as=pgenes.as -extraIndex=hugo,name,ppgene pseudopipePgenes.bed /hive/data/genomes/hg38/chrom.sizes pseudopipePgenes.bb
@@ -117,10 +115,4 @@ ixIxx name.table pseudopipeParents.ix pseudopipeParents.ixx
 #rm addMe v37.tsv v38.sub V38.bed v37.sub sub.me sub.list idMiss.txt
 #rm *.bed
 #rm name.table uniq.gtf all.ids
-
-
-
-
-
-
 

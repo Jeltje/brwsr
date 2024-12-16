@@ -43,7 +43,7 @@ class Gene(object):
 		self.geneEnd = end
 		self.strand = strand
 		self.blockList = [BedBlock(start, end)]
-		self.extraCols = (tx,) + extrafields
+		self.extraCols = extrafields
 	def add(self, start, end):
 		self.geneStart = min(start, self.geneStart)
 		self.geneEnd = max(end, self.geneEnd)
@@ -97,10 +97,8 @@ def ids_from_gtf(descrField, gdict):
 	elif data_dict['gene_type'] == 'processed_pseudogene':
 		itemRgb = '85,107,47' # dark olive green 
 	# drop transcript parent because we might have changed the gene parent
-	# add an empty placeholder to put the link to parent (in the parent script)
-	# note that we prepend a field later, so url (parent not listed) becomes the 6th item
 	extrafields = tuple([hugo, data_dict['gene_type'], data_dict['gene_id'],  
-		data_dict['gene_ens_id'], 'parent not listed', data_dict['gene_parent_id'], 
+		data_dict['gene_ens_id'], data_dict['gene_parent_id'], 
 		data_dict['protein_parent_id']])
 	return itemRgb, data_dict['transcript_id'], extrafields
 

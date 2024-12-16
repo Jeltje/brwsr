@@ -50,9 +50,10 @@ Maybe update pgenes bed with parent links.
 	parentDict = dict()
 	with open(args.pgenebed, 'r') as INF, open(args.pgeneout, 'w') as OUTF:
 		for bedObj in BedReader(INF, numStdCols=12):
-			# parent ENSG is in field 6
-			parent = bedObj.extraCols[6]
+			# parent ENSG
+			parent = bedObj.extraCols[4]
 			if parent == 'NA':
+				bedObj.extraCols[4] = 'parent not listed'
 				bedObj.write(OUTF)
 				continue
 			if not parent in ensgDict:
@@ -68,7 +69,8 @@ Maybe update pgenes bed with parent links.
 
 			url = parentlink.format(chrom=parentTuple.chrom, start=parentTuple.start,
 				end=parentTuple.end, geneID=parent) 
-			bedObj.extraCols[5] = url
+			# replace the parent ID with the URL to it
+			bedObj.extraCols[4] = url
 			bedObj.write(OUTF)
 	# now print parent track, adding one block per child for each parent
 	with open(args.parentout, 'w') as OUTF2:
@@ -85,7 +87,7 @@ class Gene(object):
 		self.geneEnd = parentTuple.end
 		self.strand = parentTuple.strand
 		self.children = [childObj]
-		self.symbol = childObj.extraCols[1]
+		self.symbol = childObj.extraCols[0]
 	def add(self, childObj):
 		self.children.append(childObj)
 	def write(self, FH):

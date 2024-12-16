@@ -9,7 +9,6 @@ compositeTrack on
         track pseudogenes
         shortLabel PseudoPipe pseudogenes
         longLabel PseudoPipe pseudogenes
-        parent PseudoPipe on
         type bigBed 12 +
         bigDataUrl pseudopipePgenes.bb
         visibility pack
@@ -20,14 +19,13 @@ compositeTrack on
         searchTrix pseudopipe.ix
         labelSeparator " "
         html description.html
-        mouseOver pseudopipe ID: ${ppgene} <br> parent Ensembl gene ID: ${parentUrl}
+        mouseOver pseudopipe ID: ${ppgene} <br> parent Ensembl gene ID: ${geneParent}
 	parent pseudopipe
         priority 1
 
 	track parents
 	shortLabel PseudoPipe parents
 	longLabel PseudoPipe parents
-	parent PseudoPipe on
 	type bigBed 9 +
 	bigDataUrl pseudopipeParents.bb
 	visibility pack
