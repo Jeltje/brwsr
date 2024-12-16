@@ -2,8 +2,11 @@ track ncbiOrtho
 shortLabel ncbiOrtho
 longLabel NCBI orthologs
 type bigBed 9 +
-bigDataUrl ncbiOrtho2.bb
+bigDataUrl ncbiOrtho.bb
+group compGeno
 visibility pack
+searchIndex hugo,name
+searchTrix ncbiOrtho.ix
 labelFields hugo, name
 defaultLabelFields hugo
 itemRgb on

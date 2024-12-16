@@ -1,0 +1,5 @@
+7955	zebrafish	danRer11
+9606	human	hg38
+9913	cow	bosTau9
+10090	mouse	mm39
+9615	dog	canFam6
