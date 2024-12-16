@@ -1,2 +1,14 @@
 genome hg38
 trackDb hg38/trackDb.txt
+
+genome danRer11
+trackDb danRer11/trackDb.txt
+
+genome bosTau9
+trackDb bosTau9/trackDb.txt
+
+genome mm39
+trackDb mm39/trackDb.txt
+
+genome canFam6
+trackDb canFam6/trackDb.txt
